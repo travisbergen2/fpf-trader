@@ -89,7 +89,7 @@ public:
         {
             CloseBar(tick.time_msc);
         }
-        else if (m_chrono_type == CHRONO_VOLUME_BAR && m_volume_count >= m_threshold)
+        else if (m_chrono_type == CHRONO_VOLUME_BAR && m_volume_count >= (ulong)m_threshold)
         {
             CloseBar(tick.time_msc);
         }
