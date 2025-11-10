@@ -262,7 +262,7 @@ void CalculateExternalForcing(double &A_ext_vector[])
 //+------------------------------------------------------------------+
 //| Custom function for Trading Logic: Expectation -> Action |
 //+------------------------------------------------------------------+
-void TradingLogic(const double &A_ext_vector[])
+void TradingLogic(double &A_ext_vector[])
 {
     // 1. Check for existing position
     if (PositionSelect(Symbol()))
@@ -481,7 +481,7 @@ void LogFPFState()
 //+------------------------------------------------------------------+
 //| Custom function to log External Forcing Vector |
 //+------------------------------------------------------------------+
-void LogExternalForcing(const double &A_ext_vector[])
+void LogExternalForcing(double &A_ext_vector[])
 {
     string log_message = StringFormat(
         "=== EXTERNAL FORCING ===\n" +
@@ -500,7 +500,7 @@ void LogExternalForcing(const double &A_ext_vector[])
 //+------------------------------------------------------------------+
 //| Custom function to log FPF Derivative (Expectation) |
 //+------------------------------------------------------------------+
-void LogDerivative(const double &dPdt[])
+void LogDerivative(double &dPdt[])
 {
     string log_message = StringFormat(
         "=== FPF DERIVATIVE (Expectation) ===\n" +
