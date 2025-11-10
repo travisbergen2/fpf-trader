@@ -12,6 +12,7 @@
 #include "FPF_Engine.mqh"
 #include "Chronoception.mqh"
 #include <Trade\Trade.mqh> // Required for CTrade class
+#include <Arrays\ArrayDouble.mqh> // Required for CArrayDouble class
 
 //--- Input Parameters ---
 input string Inp_FPF_Settings = "--- FPF Settings ---";

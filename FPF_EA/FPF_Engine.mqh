@@ -58,14 +58,14 @@ public:
     }
 
     // Matrix-Vector Multiplication (Result = Matrix * Vector)
-    void Multiply(const double &vector[], double &result[]) const
+    void Multiply(const double &input_vector[], double &output_result[])
     {
         for (int i = 0; i < FPF_DIMENSION; i++)
         {
-            result[i] = 0.0;
+            output_result[i] = 0.0;
             for (int j = 0; j < FPF_DIMENSION; j++)
             {
-                result[i] += m_data[i][j] * vector[j];
+                output_result[i] += m_data[i][j] * input_vector[j];
             }
         }
     }
@@ -93,7 +93,7 @@ private:
     // 1. Generate the Internal Coupling Matrix J(P) - The Symmetric/Antisymmetric Core
     // This is the most complex part, where the "personality" is generated.
     // The matrix J is often a function of P itself in non-linear systems.
-    void GenerateCouplingMatrix(const double P[])
+    void GenerateCouplingMatrix(const double &P[])
     {
         m_J.Zero();
         // Placeholder logic: In the final version, this will implement the
@@ -125,7 +125,7 @@ private:
 
     // 3. Calculate the derivative dP/dt (The Core Equation)
     // dP/dt = -kP + J(P)P + A_ext(t)
-    void CalculateDerivative(const double P[], double dPdt[], const double A_ext_vector[])
+    void CalculateDerivative(const double &P[], double &dPdt[], const double &A_ext_vector[])
     {
         // 1. Calculate J(P)P
         double J_times_P[FPF_DIMENSION];
@@ -147,7 +147,7 @@ private:
 
     // 4. Runge-Kutta 4th Order (RK4) Numerical Integration Step
     // This is the "time evolution" step.
-    void RK4Step(double P[], const double A_ext_vector[])
+    void RK4Step(double &P[], const double &A_ext_vector[])
     {
         double k1[FPF_DIMENSION], k2[FPF_DIMENSION], k3[FPF_DIMENSION], k4[FPF_DIMENSION];
         double P_temp[FPF_DIMENSION];
@@ -197,7 +197,7 @@ public:
     }
 
     // Public method to initialize the state (e.g., from a file or default values)
-    void Initialize(double initial_P[FPF_DIMENSION])
+    void Initialize(const double &initial_P[])
     {
         for (int i = 0; i < FPF_DIMENSION; i++)
             m_P[i] = initial_P[i];
@@ -215,13 +215,13 @@ public:
     double GetTimeStep() const { return m_dt; }
 
     // Public method to advance the state by one time step (the core "blink")
-    void AdvanceState(const double A_ext_vector[])
+    void AdvanceState(const double &A_ext_vector[])
     {
         RK4Step(m_P, A_ext_vector);
     }
 
     // Public method to get the current state vector P
-    void GetState(double P_out[]) const
+    void GetState(double &P_out[])
     {
         for (int i = 0; i < FPF_DIMENSION; i++)
             P_out[i] = m_P[i];
@@ -236,7 +236,7 @@ public:
     }
 
     // Public method to get the derivative (for Expectation/Prediction)
-    void GetDerivative(double dPdt_out[], const double A_ext_vector[])
+    void GetDerivative(double &dPdt_out[], const double &A_ext_vector[])
     {
         GenerateCouplingMatrix(m_P);
         CalculateDerivative(m_P, dPdt_out, A_ext_vector);

@@ -33,7 +33,7 @@ private:
     double m_low_price;
     double m_close_price;
     long m_tick_count;
-    long m_volume_count;
+    ulong m_volume_count; // Changed to ulong to match MqlTick.volume type
     bool m_new_bar_flag;
 
     // Output: Temporal Density (Time Axis Input for FPF)
@@ -152,7 +152,7 @@ public:
     double GetLow() const { return m_low_price; }
     double GetClose() const { return m_close_price; }
     long GetTickCount() const { return m_tick_count; }
-    long GetVolumeCount() const { return m_volume_count; }
+    ulong GetVolumeCount() const { return m_volume_count; }
     bool IsNewBar() const { return m_new_bar_flag; }
 
     // Public getter for the Temporal Density (FPF Time Axis Input)
