@@ -91,34 +91,100 @@ private:
     //--- Private Methods ---
 
     // 1. Generate the Internal Coupling Matrix J(P) - The Symmetric/Antisymmetric Core
-    // This is the most complex part, where the "personality" is generated.
-    // The matrix J is often a function of P itself in non-linear systems.
+    // J(P) = S + A where:
+    // S = symmetric (resonance) matrix - encourages coherence
+    // A = antisymmetric (orbital) matrix - creates rotation/orbital flow
     void GenerateCouplingMatrix(double &P[])
     {
-        m_J.Zero();
-        // Placeholder logic: In the final version, this will implement the
-        // coupling of the symmetric (resonance) and antisymmetric (orbital) matrices
-        // based on the current state P, as per the user's model.
-        // For now, we use a simple placeholder to ensure the structure is correct.
+        // Parameters for coupling matrix (can be made inputs later for optimization)
+        double alpha = 0.5;    // resonance strength
+        double beta = 1.0;     // sensitivity to differences
+        double gamma = 0.6;    // spatial attenuation
+        double kappa = 0.12;   // global resonance gain
+        double lambda = 0.8;   // local amplitude normalization
+        double delta = 0.35;   // antisymmetric strength
+        double omega = 1.2;    // orbital frequency multiplier
+        double phi = 0.7;      // third-axis phase influence
+        double eta = 0.45;     // antisymm attenuation by distance
+
+        // Compute mean of P (global field coherence measure)
+        double m = 0.0;
+        for (int r = 0; r < FPF_DIMENSION; r++)
+            m += P[r];
+        m /= (double)FPF_DIMENSION;
+
+        // Temporary storage for S and A matrices
+        double S[FPF_DIMENSION][FPF_DIMENSION];
+        double A[FPF_DIMENSION][FPF_DIMENSION];
+
+        // Initialize
+        for (int i = 0; i < FPF_DIMENSION; i++)
+            for (int j = 0; j < FPF_DIMENSION; j++)
+            {
+                S[i][j] = 0.0;
+                A[i][j] = 0.0;
+            }
+
+        // Build symmetric and antisymmetric components
         for (int i = 0; i < FPF_DIMENSION; i++)
         {
             for (int j = 0; j < FPF_DIMENSION; j++)
             {
-                // Example: Simple non-linear coupling based on P[i] and P[j]
-                double value = 0.0;
+                int dij = MathAbs(i - j);
+
+                // === SYMMETRIC COMPONENT (Resonance) ===
+                // S_ij = alpha * avg(P) * cos(beta*diff) * exp(-gamma*d) * resonance / normalization
+                double avg = 0.5 * (P[i] + P[j]);
+                double diff = (P[i] - P[j]);
+                double cosTerm = MathCos(beta * diff);
+                double attenuation = MathExp(-gamma * dij);
+                double resonance = 1.0 + kappa * m * m;  // global resonance factor
+                double normalization = 1.0 + lambda * (MathAbs(P[i]) + MathAbs(P[j]));
+
+                S[i][j] = alpha * avg * cosTerm * attenuation * resonance / normalization;
+
+                // === ANTISYMMETRIC COMPONENT (Orbital/Rotation) ===
                 if (i == j)
                 {
-                    // Diagonal elements (self-interaction)
-                    value = 0.1 * P[i];
+                    A[i][j] = 0.0;  // Diagonal must be zero for antisymmetry
                 }
                 else
                 {
-                    // Off-diagonal elements (interaction between axes)
-                    value = 0.05 * MathSin(P[i] * P[j]);
+                    // Third-axis phase coupling index
+                    int k = (i + j) % FPF_DIMENSION;
+
+                    // A_ij = delta * (Pi - Pj) * sin(omega*(Pi+Pj) + phi*Pk) * exp(-eta*d)
+                    double base = (P[i] - P[j]);
+                    double sinTerm = MathSin(omega * (P[i] + P[j]) + phi * P[k]);
+                    double attenA = MathExp(-eta * dij);
+
+                    A[i][j] = delta * base * sinTerm * attenA;
                 }
-                m_J.Set(i, j, value);
             }
         }
+
+        // Enforce strict symmetry for S and strict antisymmetry for A
+        for (int i = 0; i < FPF_DIMENSION; i++)
+        {
+            for (int j = i + 1; j < FPF_DIMENSION; j++)
+            {
+                // Make S symmetric: S[i][j] = S[j][i]
+                double Ssym = 0.5 * (S[i][j] + S[j][i]);
+                S[i][j] = Ssym;
+                S[j][i] = Ssym;
+
+                // Make A antisymmetric: A[j][i] = -A[i][j]
+                double a = 0.5 * (A[i][j] - A[j][i]);
+                A[i][j] = a;
+                A[j][i] = -a;
+            }
+        }
+
+        // Write final J = S + A into m_J
+        m_J.Zero();
+        for (int i = 0; i < FPF_DIMENSION; i++)
+            for (int j = 0; j < FPF_DIMENSION; j++)
+                m_J.Set(i, j, S[i][j] + A[i][j]);
     }
 
 
