@@ -121,10 +121,18 @@ private:
 
             // We will need to further normalize this value (e.g., using a moving average)
             // in the main EA to keep it within the FPF's expected range (e.g., -1 to 1).
+
+            // Log the bar formation
+            string bar_type = (m_chrono_type == CHRONO_TICK_BAR) ? "TICK" :
+                             (m_chrono_type == CHRONO_VOLUME_BAR) ? "VOLUME" : "RANGE";
+            Print(StringFormat("CHRONOCEPTION: %s Bar Closed | O: %.5f | H: %.5f | L: %.5f | C: %.5f | Ticks: %d | Duration: %.2fs | Density: %.4f",
+                bar_type, m_open_price, m_high_price, m_low_price, m_close_price,
+                m_tick_count, normalized_time, m_temporal_density));
         }
         else
         {
             m_temporal_density = 0.0;
+            Print("WARNING: Chronoception bar formed with zero time elapsed. Setting temporal density to 0.");
         }
 
         // 2. Set the flag and reset for the next bar

@@ -45,6 +45,14 @@ string g_related_symbols_array[];
 int g_related_symbols_count = 0;
 double g_point_value; // Symbol's point value for calculations
 
+// Store previous tick data for each related symbol for proper correlation analysis
+struct SSymbolTickData
+{
+    double last_price;
+    long last_time;
+};
+SSymbolTickData g_related_symbols_prev_tick[];
+
 //+------------------------------------------------------------------+
 //| Expert initialization function |
 //+------------------------------------------------------------------+
@@ -61,8 +69,9 @@ int OnInit()
 
     // 2. Initialize Trade Object and Magic Number
     g_trade.SetExpertMagicNumber(Inp_Magic_Number);
-    g_trade.SetMarginMode();
     g_trade.SetTypeFilling(ORDER_FILLING_FOK); // Use FOK as a robust default
+
+    Print("DEBUG: Trade object initialized with Magic Number: ", Inp_Magic_Number);
     
     // Initialize CArrayDouble
     g_p_history = new CArrayDouble();
@@ -75,13 +84,16 @@ int OnInit()
     // 3. Parse and Check Related Symbols (The Social Field)
     // StringSplit returns the number of elements
     g_related_symbols_count = StringSplit(Inp_Related_Symbols, ',', g_related_symbols_array);
-    
+
     if (g_related_symbols_count == 0)
     {
         Print("ERROR: No related symbols defined. The Social Field is empty. EA will not run.");
         return(INIT_FAILED);
     }
-    
+
+    // Initialize previous tick data array
+    ArrayResize(g_related_symbols_prev_tick, g_related_symbols_count);
+
     // Check if all symbols exist and subscribe to them
     for (int i = 0; i < g_related_symbols_count; i++)
     {
@@ -90,6 +102,17 @@ int OnInit()
         {
             Print("WARNING: Could not select symbol '", symbol, "'. It will be ignored.");
             g_related_symbols_array[i] = ""; // Mark as invalid
+        }
+        else
+        {
+            // Initialize previous tick data
+            MqlTick tick;
+            if (SymbolInfoTick(symbol, tick))
+            {
+                g_related_symbols_prev_tick[i].last_price = tick.last;
+                g_related_symbols_prev_tick[i].last_time = tick.time_msc;
+                Print("DEBUG: Initialized symbol ", symbol, " at price ", tick.last);
+            }
         }
     }
 
@@ -135,9 +158,12 @@ void OnTick()
     // 2. If a new Chrono-Bar has closed, update the FPF state
     if (new_chrono_bar)
     {
+        Print("========== NEW CHRONO-BAR FORMED ==========");
+
         // A. Calculate the External Forcing Vector (A_ext)
         double A_ext_vector[FPF_DIMENSION];
         CalculateExternalForcing(A_ext_vector);
+        LogExternalForcing(A_ext_vector);
 
         // B. Update the FPF Engine (The "Emotional Lens" blinks)
         g_fpf_engine.AdvanceState(A_ext_vector);
@@ -150,6 +176,8 @@ void OnTick()
 
         // E. Log the new state for research/debugging
         LogFPFState();
+
+        Print("==========================================");
     }
 }
 
@@ -184,7 +212,7 @@ void CalculateExternalForcing(double &A_ext_vector[])
     // The Social Axis is influenced by the coherence/divergence of related symbols.
     double social_coherence_score = 0.0;
     int valid_symbols = 0;
-    
+
     // Get the direction of the main symbol's last chrono-bar
     double main_direction = MathSign(bar_direction);
 
@@ -192,27 +220,28 @@ void CalculateExternalForcing(double &A_ext_vector[])
     {
         string symbol = g_related_symbols_array[i];
         if (symbol == "") continue; // Skip invalid symbols
-        
+
         MqlTick tick;
         if (SymbolInfoTick(symbol, tick))
         {
-            // Simple Social Field Logic: Check if the related symbol's last tick direction
-            // aligns with the main symbol's chrono-bar direction.
-            // A more advanced model would use the FPF state of the related symbol itself.
-            
-            // For now, we use a simple correlation of the last tick movement.
-            double tick_change = tick.last - tick.bid; // Proxy for recent movement
-            double related_direction = MathSign(tick_change);
-            
-            if (related_direction == main_direction)
+            // Calculate the actual price change since last chrono-bar for this symbol
+            double price_change = tick.last - g_related_symbols_prev_tick[i].last_price;
+            double related_direction = MathSign(price_change);
+
+            // Check if the related symbol's direction aligns with main symbol's direction
+            if (related_direction == main_direction && main_direction != 0)
                 social_coherence_score += 1.0;
-            else
+            else if (related_direction != 0 && main_direction != 0)
                 social_coherence_score -= 1.0;
-                
+
+            // Update the stored tick data for next comparison
+            g_related_symbols_prev_tick[i].last_price = tick.last;
+            g_related_symbols_prev_tick[i].last_time = tick.time_msc;
+
             valid_symbols++;
         }
     }
-    
+
     if (valid_symbols > 0)
     {
         // Normalize the score to [-1, 1]
@@ -237,6 +266,7 @@ void TradingLogic(const double &A_ext_vector[])
     // 1. Check for existing position
     if (PositionSelect(Symbol()))
     {
+        Print("DEBUG: Position already open. Checking for exit signal...");
         // Position exists, check for exit signal (e.g., Will/Emotion decay)
         CheckForExit();
         return;
@@ -245,6 +275,7 @@ void TradingLogic(const double &A_ext_vector[])
     // 2. Generate Expectation (Prediction) from FPF Derivative
     double dPdt[FPF_DIMENSION];
     g_fpf_engine.GetDerivative(dPdt, A_ext_vector);
+    LogDerivative(dPdt);
 
     // Expectation: A strong, coherent directional move (Will) supported by high Volatility (Emotion)
     double will_derivative = dPdt[AXIS_WILL];
@@ -258,18 +289,36 @@ void TradingLogic(const double &A_ext_vector[])
     double emotion_threshold = 0.05; // To be optimized
     double social_threshold = 0.01; // To be optimized
 
+    Print(StringFormat("=== SIGNAL ANALYSIS ===\n" +
+        "  Will Derivative: %.6f (threshold: %.6f)\n" +
+        "  Emotion State:   %.6f (threshold: %.6f)\n" +
+        "  Social State:    %.6f (threshold: %.6f)",
+        will_derivative, entry_threshold,
+        emotion_state, emotion_threshold,
+        social_state, social_threshold));
+
     if (emotion_state > emotion_threshold && social_state > social_threshold)
     {
         // BUY Signal: Strong positive Will emergence
         if (will_derivative > entry_threshold)
         {
+            Print("*** BUY SIGNAL DETECTED: Strong positive Will emergence with high Emotion and positive Social coherence ***");
             ExecuteTrade(ORDER_TYPE_BUY);
         }
         // SELL Signal: Strong negative Will emergence
         else if (will_derivative < -entry_threshold)
         {
+            Print("*** SELL SIGNAL DETECTED: Strong negative Will emergence with high Emotion and positive Social coherence ***");
             ExecuteTrade(ORDER_TYPE_SELL);
         }
+        else
+        {
+            Print("DEBUG: Emotion and Social conditions met, but Will derivative not strong enough.");
+        }
+    }
+    else
+    {
+        Print("DEBUG: Entry conditions not met (Emotion or Social thresholds not satisfied).");
     }
 }
 
@@ -324,21 +373,38 @@ void CheckForExit()
     // Receptive/Detached: Low Will and Low Emotion.
     double will_state = g_fpf_engine.GetAxisValue(AXIS_WILL);
     double emotion_state = g_fpf_engine.GetAxisValue(AXIS_EMOTION);
-    
+
     double exit_will_threshold = 0.005; // To be optimized
     double exit_emotion_threshold = 0.01; // To be optimized
-    
+
+    Print(StringFormat("=== EXIT ANALYSIS ===\n" +
+        "  Will State:    %.6f (abs threshold: %.6f)\n" +
+        "  Emotion State: %.6f (threshold: %.6f)",
+        will_state, exit_will_threshold,
+        emotion_state, exit_emotion_threshold));
+
     if (MathAbs(will_state) < exit_will_threshold && emotion_state < exit_emotion_threshold)
     {
+        Print("*** EXIT SIGNAL: FPF state moved to Receptive/Detached quadrant ***");
+        // Get position info before closing for logging
+        double profit = PositionGetDouble(POSITION_PROFIT);
+        double open_price = PositionGetDouble(POSITION_PRICE_OPEN);
+        ENUM_POSITION_TYPE pos_type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+
         // Close the position
         if (g_trade.PositionClose(Symbol()))
         {
-            Print("TRADE CLOSED: FPF state moved to Receptive/Detached quadrant.");
+            Print(StringFormat("TRADE CLOSED: Type: %s | Open: %.5f | Profit: %.2f | Reason: Receptive/Detached",
+                EnumToString(pos_type), open_price, profit));
         }
         else
         {
             Print("TRADE CLOSE FAILED: ", g_trade.ResultRetcode(), " - ", g_trade.ResultComment());
         }
+    }
+    else
+    {
+        Print("DEBUG: Exit conditions not met. Position remains open.");
     }
 }
 
@@ -395,13 +461,57 @@ void LogFPFState()
 {
     double P[FPF_DIMENSION];
     g_fpf_engine.GetState(P);
-    
+
     string log_message = StringFormat(
-        "FPF State | C: %.4f | E: %.4f | W: %.4f | S: %.4f | T: %.4f | ChronoBar Close: %.5f",
+        "=== FPF STATE ===\n" +
+        "  Cognition: %.6f | Emotion: %.6f | Will: %.6f | Social: %.6f | Time: %.6f\n" +
+        "  ChronoBar | O: %.5f | H: %.5f | L: %.5f | C: %.5f | Ticks: %d\n" +
+        "  Temporal Density: %.4f",
         P[AXIS_COGNITION], P[AXIS_EMOTION], P[AXIS_WILL], P[AXIS_SOCIAL], P[AXIS_TIME],
-        g_chrono_engine.GetClose()
+        g_chrono_engine.GetOpen(), g_chrono_engine.GetHigh(),
+        g_chrono_engine.GetLow(), g_chrono_engine.GetClose(),
+        g_chrono_engine.GetTickCount(),
+        g_chrono_engine.GetTemporalDensity()
     );
-    
+
+    Print(log_message);
+}
+
+//+------------------------------------------------------------------+
+//| Custom function to log External Forcing Vector |
+//+------------------------------------------------------------------+
+void LogExternalForcing(const double &A_ext_vector[])
+{
+    string log_message = StringFormat(
+        "=== EXTERNAL FORCING ===\n" +
+        "  A_ext[Cognition]: %.6f\n" +
+        "  A_ext[Emotion]:   %.6f\n" +
+        "  A_ext[Will]:      %.6f\n" +
+        "  A_ext[Social]:    %.6f\n" +
+        "  A_ext[Time]:      %.6f",
+        A_ext_vector[AXIS_COGNITION], A_ext_vector[AXIS_EMOTION],
+        A_ext_vector[AXIS_WILL], A_ext_vector[AXIS_SOCIAL], A_ext_vector[AXIS_TIME]
+    );
+
+    Print(log_message);
+}
+
+//+------------------------------------------------------------------+
+//| Custom function to log FPF Derivative (Expectation) |
+//+------------------------------------------------------------------+
+void LogDerivative(const double &dPdt[])
+{
+    string log_message = StringFormat(
+        "=== FPF DERIVATIVE (Expectation) ===\n" +
+        "  dP/dt[Cognition]: %.6f\n" +
+        "  dP/dt[Emotion]:   %.6f\n" +
+        "  dP/dt[Will]:      %.6f (*** KEY for entry ***)\n" +
+        "  dP/dt[Social]:    %.6f\n" +
+        "  dP/dt[Time]:      %.6f",
+        dPdt[AXIS_COGNITION], dPdt[AXIS_EMOTION],
+        dPdt[AXIS_WILL], dPdt[AXIS_SOCIAL], dPdt[AXIS_TIME]
+    );
+
     Print(log_message);
 }
 

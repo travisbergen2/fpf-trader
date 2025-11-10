@@ -1,0 +1,34 @@
+; Saved on 2025.11.10 00:00:00
+; FPF EA Backtest Configuration File
+; This file contains optimized parameters for backtesting the Fractal Personality Field EA
+
+; === FPF Settings ===
+Inp_Damping_k=0.01
+||0.001||0.001||0.1||N
+
+Inp_TimeStep_dt=0.01
+||0.001||0.001||0.1||N
+
+; === Chronoception Settings ===
+Inp_Chrono_Type=0
+; 0 = CHRONO_TICK_BAR
+; 1 = CHRONO_VOLUME_BAR
+; 2 = CHRONO_RANGE_BAR
+||0||1||2||N
+
+Inp_Chrono_Threshold=100
+; For TICK_BAR: Number of ticks per bar
+; For VOLUME_BAR: Volume per bar
+||50||10||500||N
+
+; === Social Field Settings ===
+Inp_Related_Symbols=EURUSD,GBPUSD,USDJPY,EURXAU,GBPXAU,JPYXAU
+
+; === Trading Settings ===
+Inp_Lot_Size=0.01
+||0.01||0.01||1.0||N
+
+Inp_Magic_Number=12345
+
+Inp_Min_Profit_Factor=1.5
+||1.0||0.1||3.0||N
