@@ -265,12 +265,12 @@ void CalculateExternalForcing(double &A_ext_vector[])
 //+------------------------------------------------------------------+
 //| Custom function to calculate the magnitude of a vector |
 //+------------------------------------------------------------------+
-double VectorMagnitude(double &vector[], const int size)
+double VectorMagnitude(double &vec[], int size)
 {
     double sum_sq = 0.0;
     for (int i = 0; i < size; i++)
     {
-        sum_sq += vector[i] * vector[i];
+        sum_sq += vec[i] * vec[i];
     }
     return MathSqrt(sum_sq);
 }
