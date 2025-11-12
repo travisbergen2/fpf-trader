@@ -1,0 +1,44 @@
+==============================================================================
+IMPORTANT: Which file to compile
+==============================================================================
+
+**COMPILE THIS FILE:**
+Experts/FPF_EA/FPF_MANUS_FINAL.mq5
+
+This is the latest version with:
+✅ Manus's Triune Intelligence system
+✅ All bug fixes applied
+✅ VectorMagnitude fixed (parameter renamed from 'vector' to 'vec')
+✅ Social field correlation fixed
+✅ All array syntax corrected
+✅ Fresh filename (no MetaEditor cache issues)
+
+**DO NOT COMPILE:**
+- Experts/FPF_EA/FPF_EA.mq5 (might have cache issues)
+- FPF_EA/FPF_EA.mq5 (old location)
+
+==============================================================================
+Expected Result: 0 errors, 0 warnings
+==============================================================================
+
+If you see errors mentioning CopyBuffer, those are NOT in this file.
+The current EA does not use any indicator buffers (iMA, iRSI, iATR, etc.)
+
+If you see errors about bar_direction or price_change, those are phantom
+cache errors - both variables are properly declared before use.
+
+==============================================================================
+How to Compile
+==============================================================================
+1. Close ALL tabs in MetaEditor
+2. Exit MetaEditor completely
+3. Reopen MetaEditor
+4. Open: Experts/FPF_EA/FPF_MANUS_FINAL.mq5
+5. Press F7
+6. Expected: 0 errors, 0 warnings ✅
+
+==============================================================================
+If You Still See Errors
+==============================================================================
+Please copy the EXACT error messages and paste them so I can fix them.
+Make sure you're compiling FPF_MANUS_FINAL.mq5, not a different file.
